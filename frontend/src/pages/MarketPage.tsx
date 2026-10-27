@@ -7,6 +7,7 @@ import { ErrorMessage } from "../components/common/ErrorMessage";
 import { Loader } from "../components/common/Loader";
 import { MacroPanel } from "../components/macro/MacroPanel";
 import { NewsPanel } from "../components/news/NewsPanel";
+import { PairLogo } from "../components/pairs/PairLogo";
 import { usePair } from "../hooks/usePairs";
 import { ApiError } from "../services/api";
 import { useMarketStore } from "../store/marketStore";
@@ -44,10 +45,13 @@ export function MarketPage() {
         <span aria-hidden="true">←</span> Tous les marchés
       </Link>
       <div className="mb-6 mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">{pair.base} / {pair.quote}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-fg">{pair.symbol}</h1>
-          <p className="mt-1 text-sm text-muted">{pair.name}</p>
+        <div className="flex items-center gap-4">
+          <PairLogo pair={pair} size="lg" />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">{pair.base} / {pair.quote}</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-fg">{pair.symbol}</h1>
+            <p className="mt-1 text-sm text-muted">{pair.name}</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-lg border border-line/[0.08] px-3 py-2 text-xs text-muted">{pair.tradingview_symbol}</span>

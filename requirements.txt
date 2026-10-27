@@ -1,2 +1,14 @@
-# Dépendances Python installées par Vercel pour api/index.py (les mêmes que le backend).
--r backend/requirements.txt
+# Dépendances Python installées par Vercel pour api/index.py.
+# Vercel ne gère pas "-r backend/requirements.txt" : garder cette liste alignée sur backend/requirements.txt
+# (gunicorn et uvicorn-worker en moins, inutiles en serverless).
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+sqlalchemy>=2.0,<3.0
+alembic>=1.13,<2.0
+pydantic>=2.8,<3.0
+pydantic-settings>=2.4,<3.0
+httpx>=0.27,<1.0
+apscheduler>=3.10,<4.0
+feedparser>=6.0,<7.0
+psycopg[binary]>=3.2,<4.0
+redis>=5.0,<6.0

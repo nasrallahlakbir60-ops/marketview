@@ -108,7 +108,26 @@ cd frontend && npm ci && npm test
 
 (Sous Windows, remplacez `.venv/bin/` par `.venv\Scripts\`.)
 
-## Déploiement (production)
+## Déploiement sur Vercel (un seul projet : site + API)
+
+`vercel.json` (à la racine) relie les deux dossiers sur **une seule URL** :
+
+- `frontend/` est construit et servi en statique (`/`, `/market/...`) ;
+- `/api/*`, `/health` et `/docs` sont relayés vers `api/index.py`, qui charge l'application FastAPI de `backend/`. Même domaine pour le navigateur : aucune configuration CORS nécessaire.
+
+Limites de Vercel : pas de WebSocket (les news sont rechargées automatiquement toutes les 60 s, indicateur « Auto 60 s »), et pas de processus permanent. Le scheduler est remplacé par `GET /api/cron/refresh`.
+
+1. **Projet Vercel** : *Settings > General > Root Directory* **vide** (racine du dépôt), *Framework Preset* : **Other**. Les commandes de build viennent de `vercel.json`.
+2. **Base PostgreSQL** : *Storage* (ou *Marketplace*) > **Neon** > *Connect* au projet. La variable `DATABASE_URL` est créée automatiquement.
+3. **Redis (facultatif, recommandé pour le cache)** : *Marketplace* > **Upstash Redis** > *Connect*. `REDIS_URL` ou `KV_URL` est reconnue automatiquement.
+4. **Variables d'environnement** (*Settings > Environment Variables*) :
+   - `CRON_SECRET` : longue valeur aléatoire (ex. résultat de `python -c "import secrets; print(secrets.token_urlsafe(32))"`) ;
+   - `FINNHUB_API_KEY`, `FRED_API_KEY` (facultatives).
+5. **Redéployer** (*Deployments > ... > Redeploy*). Au premier démarrage, l'API crée les tables et charge les 80 paires.
+6. **Remplir les données** : *Settings > Cron Jobs > /api/cron/refresh > Run*. Ensuite, Vercel l'exécute une fois par jour (limite du plan gratuit).
+7. **Mises à jour plus fréquentes** : dans GitHub, *Settings > Secrets and variables > Actions*, ajoutez `MARKETVIEW_URL` (l'URL Vercel) et `CRON_SECRET` (même valeur). Le workflow `.github/workflows/refresh.yml` appelle alors l'API toutes les 30 min. Autre option : [cron-job.org](https://cron-job.org) (gratuit, chaque minute possible), avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
+
+## Déploiement (production, serveur Docker)
 
 La configuration de production sert le frontend statique avec Nginx, qui relaie `/api` et `/ws` vers le backend (gunicorn + uvicorn). PostgreSQL et Redis ne sont pas exposés, et un service `worker` exécute les tâches planifiées.
 

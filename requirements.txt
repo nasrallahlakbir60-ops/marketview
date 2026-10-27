@@ -1,0 +1,2 @@
+# Dépendances Python installées par Vercel pour api/index.py (les mêmes que le backend).
+-r backend/requirements.txt

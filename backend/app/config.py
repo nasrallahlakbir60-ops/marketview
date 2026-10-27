@@ -1,17 +1,22 @@
 """Configuration de l'application, lue depuis les variables d'environnement / le fichier .env."""
 
+import os
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+DEFAULT_REDIS_URL = "redis://redis:6379/0"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql+psycopg://marketview:marketview_local@db:5432/marketview"
-    redis_url: str = "redis://redis:6379/0"
+    # KV_URL : nom de la variable créée par l'intégration Upstash de Vercel. Vide = pas de Redis.
+    redis_url: str = Field(default=DEFAULT_REDIS_URL, validation_alias=AliasChoices("REDIS_URL", "KV_URL"))
     # Liste séparée par des virgules (NoDecode : pas d'interprétation JSON de la variable).
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:5173"])
 
@@ -22,6 +27,8 @@ class Settings(BaseSettings):
     tradingeconomics_key: str = ""
     twelvedata_key: str = ""
     jwt_secret: str = ""
+    # Protège /api/cron/refresh (Vercel Cron envoie "Authorization: Bearer <CRON_SECRET>").
+    cron_secret: str = ""
 
     log_level: str = "INFO"
     # Démarre APScheduler dans le processus de l'API (désactivé en production,
@@ -30,6 +37,29 @@ class Settings(BaseSettings):
     news_fetch_interval_seconds: int = 60
     rate_limit_per_minute: int = 120
     http_timeout_seconds: float = 15.0
+
+    @property
+    def on_vercel(self) -> bool:
+        return bool(os.getenv("VERCEL"))
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def use_psycopg_driver(cls, value: str) -> str:
+        """Les hébergeurs (Neon, Vercel, Render...) fournissent postgres:// ; SQLAlchemy veut postgresql+psycopg://."""
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix):]
+        return value
+
+    @model_validator(mode="after")
+    def serverless_defaults(self) -> "Settings":
+        # Sur Vercel : pas de processus permanent (scheduler remplacé par /api/cron/refresh)
+        # et pas de Redis "redis:6379" de docker-compose.
+        if self.on_vercel:
+            self.run_scheduler = False
+            if self.redis_url == DEFAULT_REDIS_URL:
+                self.redis_url = ""
+        return self
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -40,7 +70,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "finnhub_api_key", "newsapi_key", "marketaux_key", "fred_api_key",
-        "tradingeconomics_key", "twelvedata_key", "jwt_secret", mode="before",
+        "tradingeconomics_key", "twelvedata_key", "jwt_secret", "cron_secret", mode="before",
     )
     @classmethod
     def strip_keys(cls, value: object) -> object:

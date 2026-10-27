@@ -19,9 +19,9 @@ interface NewsPanelProps {
 
 export function NewsPanel({ pair }: NewsPanelProps) {
   const [filter, setFilter] = useState<string | null>(null);
-  const { data, error, isPending, refetch } = useNews(pair.symbol);
-  const { data: sources } = useQuery({ queryKey: ["news-sources"], queryFn: api.newsSources, staleTime: 5 * 60_000 });
   const { status, newIds } = useNewsSocket(pair.symbol);
+  const { data, error, isPending, refetch } = useNews(pair.symbol, status !== "live");
+  const { data: sources } = useQuery({ queryKey: ["news-sources"], queryFn: api.newsSources, staleTime: 5 * 60_000 });
   const now = useNow();
 
   const labels = useMemo(() => Object.fromEntries(pair.news_tags.map((tag) => [tag.code, tag.label])), [pair.news_tags]);

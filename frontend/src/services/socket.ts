@@ -9,7 +9,9 @@ export function wsUrl(path: string): string {
   return `${protocol}//${window.location.host}${path}`;
 }
 
-export type SocketStatus = "connecting" | "live" | "offline";
+export type SocketStatus = "connecting" | "live" | "offline" | "polling";
+
+export const liveUpdatesEnabled = import.meta.env.VITE_ENABLE_WS !== "false";
 
 interface ReconnectingSocketOptions {
   url: string;

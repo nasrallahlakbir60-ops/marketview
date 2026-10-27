@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd frontend && npm ci",
+  "buildCommand": "cd frontend && VITE_ENABLE_WS=false npm run build",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{frontend/**,docs/**,backend/tests/**,backend/.venv/**,**/*.db,**/__pycache__/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/health", "destination": "/api/index" },
+    { "source": "/docs", "destination": "/api/index" },
+    { "source": "/openapi.json", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [{ "path": "/api/cron/refresh", "schedule": "0 5 * * *" }]
+}

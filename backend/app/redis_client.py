@@ -29,6 +29,8 @@ def mark_down() -> None:
 
 
 def ensure_available() -> None:
+    if not get_settings().redis_url:
+        raise RedisUnavailable("Redis non configuré (REDIS_URL vide)")
     if time.monotonic() < _down_until:
         raise RedisUnavailable("Redis marqué indisponible, nouvel essai dans quelques secondes")
 

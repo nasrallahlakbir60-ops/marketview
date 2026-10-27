@@ -1,0 +1,27 @@
+# Rafraîchit les news / la macro / le calendrier du site Vercel (Vercel Cron gratuit = 1 fois par jour seulement).
+# À configurer dans GitHub > Settings > Secrets and variables > Actions :
+#   MARKETVIEW_URL = https://votre-projet.vercel.app   et   CRON_SECRET = la même valeur que sur Vercel.
+# Toutes les 30 min pour rester dans le quota gratuit d'un dépôt privé ; un dépôt public peut descendre à */10.
+name: Rafraîchir MarketView
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Appeler /api/cron/refresh
+        env:
+          SITE_URL: ${{ secrets.MARKETVIEW_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$SITE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Secrets MARKETVIEW_URL / CRON_SECRET absents : étape ignorée."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" "${SITE_URL%/}/api/cron/refresh"

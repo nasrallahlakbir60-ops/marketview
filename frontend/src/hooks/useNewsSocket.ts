@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { createReconnectingSocket, wsUrl, type SocketStatus } from "../services/socket";
+import { createReconnectingSocket, liveUpdatesEnabled, wsUrl, type SocketStatus } from "../services/socket";
 import type { NewsItem } from "../types";
 import { NEWS_LIMIT, newsQueryKey } from "./useNews";
 
@@ -13,11 +13,12 @@ type ServerMessage =
 /** Reçoit les news en direct et les ajoute en haut de la liste (cache React Query). */
 export function useNewsSocket(symbol: string) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<SocketStatus>("connecting");
+  const [status, setStatus] = useState<SocketStatus>(liveUpdatesEnabled ? "connecting" : "polling");
   const [newIds, setNewIds] = useState<ReadonlySet<number>>(() => new Set());
 
   useEffect(() => {
     setNewIds(new Set());
+    if (!liveUpdatesEnabled) return;
     const key = newsQueryKey(symbol);
     return createReconnectingSocket({
       url: wsUrl(`/ws/news/${encodeURIComponent(symbol)}`),

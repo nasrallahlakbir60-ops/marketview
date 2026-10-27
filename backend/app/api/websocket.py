@@ -13,7 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from app.api.pairs import find_pair
 from app.core.logging import get_logger
 from app.database import SessionLocal
-from app.redis_client import NEWS_CHANNEL, get_async_redis
+from app.redis_client import NEWS_CHANNEL, ensure_available, get_async_redis
 from app.services import pair_mapping
 
 router = APIRouter(tags=["websocket"])
@@ -40,8 +40,9 @@ async def news_socket(websocket: WebSocket, symbol: str) -> None:
         await websocket.close(code=CLOSE_UNKNOWN_PAIR, reason="Marché inconnu")
         return
 
-    pubsub = get_async_redis().pubsub()
     try:
+        ensure_available()
+        pubsub = get_async_redis().pubsub()
         await pubsub.subscribe(NEWS_CHANNEL)
     except (redis.RedisError, OSError) as exc:
         logger.warning("WebSocket news : Redis indisponible (%s)", exc)

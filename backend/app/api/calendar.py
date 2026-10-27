@@ -11,9 +11,10 @@ from app.database import get_db
 from app.models import EconomicEvent
 from app.schemas.macro import CalendarResponse, EconomicEventOut
 from app.services import cache, pair_mapping, sources
+from app.services.serverless import ensure_database, refresh_if_stale
 from app.workers.fetch_calendar import SOURCE_NAME
 
-router = APIRouter(prefix="/api/calendar", tags=["calendar"], dependencies=[Depends(rate_limit)])
+router = APIRouter(prefix="/api/calendar", tags=["calendar"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
 
 RELATIVE_DAYS = {"yesterday": -1, "today": 0, "tomorrow": 1}
 
@@ -28,7 +29,7 @@ def parse_day(value: str) -> date:
         raise HTTPException(status_code=422, detail="day doit valoir today, tomorrow, yesterday ou AAAA-MM-JJ") from exc
 
 
-@router.get("", response_model=CalendarResponse)
+@router.get("", response_model=CalendarResponse, dependencies=[Depends(refresh_if_stale("calendar"))])
 def get_calendar(
     pair: str = Query(..., description="Symbole de la paire, ex : EURUSD"),
     day: str = Query("today", description="today, tomorrow, yesterday ou AAAA-MM-JJ (journée UTC)"),

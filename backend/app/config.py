@@ -3,12 +3,17 @@
 import os
 from functools import lru_cache
 from typing import Annotated
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 DEFAULT_REDIS_URL = "redis://redis:6379/0"
+# Hôtes de docker-compose / du poste local, injoignables depuis Vercel.
+LOCAL_DB_HOSTS = {"db", "localhost", "127.0.0.1"}
+# Base de secours sur Vercel tant qu'aucune vraie base (Neon...) n'est connectée : une par instance, effacée à l'arrêt.
+VERCEL_FALLBACK_DATABASE_URL = "sqlite:////tmp/marketview.db"
 
 
 class Settings(BaseSettings):
@@ -42,6 +47,10 @@ class Settings(BaseSettings):
     def on_vercel(self) -> bool:
         return bool(os.getenv("VERCEL"))
 
+    @property
+    def uses_fallback_database(self) -> bool:
+        return self.database_url == VERCEL_FALLBACK_DATABASE_URL
+
     @field_validator("database_url", mode="after")
     @classmethod
     def use_psycopg_driver(cls, value: str) -> str:
@@ -54,11 +63,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def serverless_defaults(self) -> "Settings":
         # Sur Vercel : pas de processus permanent (scheduler remplacé par /api/cron/refresh)
-        # et pas de Redis "redis:6379" de docker-compose.
+        # et pas de Redis "redis:6379" ni de PostgreSQL "db:5432" de docker-compose.
         if self.on_vercel:
             self.run_scheduler = False
             if self.redis_url == DEFAULT_REDIS_URL:
                 self.redis_url = ""
+            if not self.database_url or urlparse(self.database_url).hostname in LOCAL_DB_HOSTS:
+                self.database_url = VERCEL_FALLBACK_DATABASE_URL
         return self
 
     @field_validator("cors_origins", mode="before")

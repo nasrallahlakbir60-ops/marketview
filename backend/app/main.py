@@ -21,10 +21,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     scheduler = None
     if settings.on_vercel:
         # Pas de docker-entrypoint.sh sur Vercel : migrations + seed (idempotents) au démarrage d'une instance.
-        from app.services.bootstrap import initialize_database
+        # En cas d'échec, les routes de données réessaient (dépendance ensure_database).
+        from app.services.serverless import initialize_once
 
         try:
-            await run_in_threadpool(initialize_database)
+            await run_in_threadpool(initialize_once)
         except Exception:
             logger.exception("Initialisation de la base impossible (DATABASE_URL configurée ?)")
     if settings.run_scheduler:

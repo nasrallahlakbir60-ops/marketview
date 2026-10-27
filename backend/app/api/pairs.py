@@ -6,8 +6,9 @@ from app.core.rate_limit import rate_limit
 from app.database import get_db
 from app.models import Pair
 from app.schemas.pair import PairDetail, PairOut
+from app.services.serverless import ensure_database
 
-router = APIRouter(prefix="/api/pairs", tags=["pairs"], dependencies=[Depends(rate_limit)])
+router = APIRouter(prefix="/api/pairs", tags=["pairs"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
 
 
 def find_pair(db: Session, symbol: str) -> Pair | None:

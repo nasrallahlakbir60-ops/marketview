@@ -12,8 +12,9 @@ from app.providers.worldbank import SOURCE as WORLD_BANK
 from app.schemas.macro import MacroCountryOut, MacroIndicatorOut, MacroResponse
 from app.schemas.news import SourceStatus
 from app.services import cache, pair_mapping, sources
+from app.services.serverless import ensure_database, refresh_if_stale
 
-router = APIRouter(prefix="/api/macro", tags=["macro"], dependencies=[Depends(rate_limit)])
+router = APIRouter(prefix="/api/macro", tags=["macro"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
 
 # Pour un même indicateur, la donnée mensuelle de FRED est préférée à la donnée annuelle de la Banque mondiale.
 SOURCE_PRIORITY = {FRED: 0, WORLD_BANK: 1}
@@ -56,7 +57,7 @@ def build_countries(db: Session, country_codes: list[str]) -> list[MacroCountryO
     return countries
 
 
-@router.get("", response_model=MacroResponse)
+@router.get("", response_model=MacroResponse, dependencies=[Depends(refresh_if_stale("macro"))])
 def get_macro(pair: str = Query(..., description="Symbole de la paire, ex : EURUSD"), db: Session = Depends(get_db)) -> MacroResponse:
     """Inflation et taux des pays de la paire (lecture BDD + cache Redis 24 h, jamais d'appel externe ici)."""
     pair_row = get_pair_or_404(db, pair)

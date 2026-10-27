@@ -9,15 +9,16 @@ from app.database import get_db
 from app.models import News, NewsCurrency
 from app.schemas.news import NewsOut, SourceStatus
 from app.services import cache, pair_mapping, sources
+from app.services.serverless import ensure_database, refresh_if_stale
 
-router = APIRouter(prefix="/api/news", tags=["news"], dependencies=[Depends(rate_limit)])
+router = APIRouter(prefix="/api/news", tags=["news"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
 
 
 def news_cache_key(symbol: str, limit: int) -> str:
     return f"news:{symbol}:{limit}"
 
 
-@router.get("", response_model=list[NewsOut])
+@router.get("", response_model=list[NewsOut], dependencies=[Depends(refresh_if_stale("news"))])
 def list_news(
     pair: str = Query(..., description="Symbole de la paire, ex : EURUSD"),
     limit: int = Query(50, ge=1, le=100),

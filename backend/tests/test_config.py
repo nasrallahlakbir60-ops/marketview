@@ -35,3 +35,20 @@ def test_upstash_kv_url_is_accepted(monkeypatch) -> None:
     monkeypatch.setenv("KV_URL", "rediss://default:x@eu1.upstash.io:6379")
 
     assert Settings().redis_url == "rediss://default:x@eu1.upstash.io:6379"
+
+
+def test_vercel_replaces_docker_database_with_sqlite_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://marketview:marketview_local@db:5432/marketview")
+
+    settings = Settings()
+
+    assert settings.database_url == "sqlite:////tmp/marketview.db"
+    assert settings.uses_fallback_database is True
+
+
+def test_vercel_keeps_real_database(monkeypatch) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@ep-x.neon.tech/db")
+
+    assert Settings().uses_fallback_database is False

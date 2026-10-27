@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Couleurs du thème (triplets RGB, utilisées par tailwind.config.js). */
+:root {
+  --c-surface: 244 246 242;
+  --c-panel: 255 255 255;
+  --c-panel-hover: 239 244 236;
+  --c-fg: 15 23 42;
+  --c-muted: 71 85 105;
+  --c-subtle: 100 116 139;
+  --c-faint: 148 163 184;
+  --c-line: 15 23 42;
+  --c-accent: 77 124 15;
+  --c-on-accent: 255 255 255;
+  --glow: rgba(77, 124, 15, 0.06);
+
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: rgb(var(--c-surface));
+}
+
+:root.dark {
+  --c-surface: 16 23 19;
+  --c-panel: 21 29 24;
+  --c-panel-hover: 26 36 29;
+  --c-fg: 255 255 255;
+  --c-muted: 148 163 184;
+  --c-subtle: 100 116 139;
+  --c-faint: 71 85 105;
+  --c-line: 255 255 255;
+  --c-accent: 184 245 106;
+  --c-on-accent: 16 23 19;
+  --glow: rgba(184, 245, 106, 0.055);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: rgb(var(--c-fg));
+  background:
+    radial-gradient(ellipse at 50% -24%, var(--glow), transparent 46%),
+    rgb(var(--c-surface));
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  color: rgb(var(--c-on-accent));
+  background: rgb(var(--c-accent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

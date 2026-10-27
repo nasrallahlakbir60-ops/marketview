@@ -1,0 +1,21 @@
+{
+  "_info": "Flux RSS publics lus par providers/rss.py. default_tags : devises / actifs toujours associés aux news du flux (complétés par les mots-clés de services/news_filter.py). Vérifier les URL avec : python scripts/check_feeds.py. Lire les conditions d'utilisation de chaque site avant une mise en ligne publique.",
+  "feeds": [
+    {"name": "FXStreet", "url": "https://www.fxstreet.com/rss/news", "default_tags": []},
+    {"name": "investingLive (ex-ForexLive)", "url": "https://investinglive.com/feed/news", "default_tags": []},
+    {"name": "Investing.com Forex", "url": "https://www.investing.com/rss/news_1.rss", "default_tags": []},
+    {"name": "CNBC Economy", "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html", "default_tags": []},
+    {"name": "BIS - discours de banquiers centraux", "url": "https://www.bis.org/doclist/cbspeeches.rss", "default_tags": []},
+    {"name": "Federal Reserve", "url": "https://www.federalreserve.gov/feeds/press_all.xml", "default_tags": ["USD"]},
+    {"name": "BCE", "url": "https://www.ecb.europa.eu/rss/press.html", "default_tags": ["EUR"]},
+    {"name": "Bank of England", "url": "https://www.bankofengland.co.uk/rss/news", "default_tags": ["GBP"]},
+    {"name": "Bank of Japan", "url": "https://www.boj.or.jp/en/rss/whatsnew.xml", "default_tags": ["JPY"]},
+    {"name": "Bank of Canada", "url": "https://www.bankofcanada.ca/content_type/press-releases/feed/", "default_tags": ["CAD"]},
+    {"name": "Banque nationale suisse", "url": "https://www.snb.ch/public/en/rss/pressrel", "default_tags": ["CHF"]},
+    {"name": "Reserve Bank of New Zealand", "url": "https://www.rbnz.govt.nz/feeds/news", "default_tags": ["NZD"]},
+    {"name": "Riksbank", "url": "https://www.riksbank.se/en-gb/rss/press-releases/", "default_tags": ["SEK"]},
+    {"name": "CoinDesk", "url": "https://www.coindesk.com/arc/outboundfeeds/rss/", "default_tags": ["CRYPTO"]},
+    {"name": "Cointelegraph", "url": "https://cointelegraph.com/rss", "default_tags": ["CRYPTO"]},
+    {"name": "OilPrice.com", "url": "https://oilprice.com/rss/main", "default_tags": ["OIL"]}
+  ]
+}

@@ -1,0 +1,579 @@
+================================================================================
+        PLAN DU PROJET : PLATEFORME WEB DE TRADING (CHART + NEWS + MACRO)
+        Nom provisoire : "MarketView"
+================================================================================
+
+SOMMAIRE
+  1. Objectif du projet
+  2. Fonctionnalités (ce que voit l'utilisateur)
+  3. Choix techniques (stack)
+  4. Sources de données (charts, news, inflation / calendrier économique)
+  5. Architecture générale
+  6. Arborescence complète des fichiers
+  7. Rôle de chaque fichier
+  8. Base de données
+  9. Routes de l'API (backend)
+ 10. Temps réel : comment afficher les news "sans délai"
+ 11. Variables d'environnement et clés API
+ 12. Planning par étapes (sprints)
+ 13. Tests
+ 14. Mise en ligne (déploiement)
+ 15. Aspects juridiques et sécurité
+ 16. Checklist finale
+
+
+--------------------------------------------------------------------------------
+1. OBJECTIF DU PROJET
+--------------------------------------------------------------------------------
+Créer un site web où l'utilisateur :
+  - choisit une paire de marché (Forex, or, crypto, indices),
+    ex : EUR/USD, GBP/USD, XAU/USD (or), BTC/USD, USD/JPY ;
+  - voit immédiatement le graphique (chart) de cette paire ;
+  - voit sur le côté :
+      a) les news en temps réel liées à cette paire / aux devises concernées ;
+      b) les indicateurs macroéconomiques du marché (inflation / CPI,
+         taux d'intérêt, prochaines annonces du calendrier économique).
+
+
+--------------------------------------------------------------------------------
+2. FONCTIONNALITÉS
+--------------------------------------------------------------------------------
+VERSION 1 (MVP - minimum à livrer)
+  [ ] Page d'accueil avec liste / recherche des paires
+  [ ] Page "Marché" : chart + panneau news + panneau macro
+  [ ] Choix de l'unité de temps du chart (1m, 5m, 15m, 1h, 4h, 1J)
+  [ ] News filtrées par devise (EUR, USD, GBP, JPY, XAU, BTC...)
+  [ ] Panneau inflation : dernier CPI, précédent, prévision, date
+  [ ] Calendrier économique du jour (impact faible / moyen / fort)
+  [ ] Mise à jour en temps réel des news (WebSocket)
+  [ ] Design responsive (PC + mobile), thème clair / sombre
+
+VERSION 2 (améliorations)
+  [ ] Comptes utilisateurs (inscription / connexion)
+  [ ] Liste de favoris (watchlist)
+  [ ] Alertes (prix atteint, news importante, annonce CPI)
+  [ ] Indicateurs techniques sur le chart (RSI, MACD, moyennes mobiles)
+  [ ] Analyse de sentiment des news (positif / négatif) avec un modèle IA
+  [ ] Multi-langues (FR / AR / EN)
+
+VERSION 3 (option)
+  [ ] Abonnement payant (Stripe ou autre)
+  [ ] Application mobile (PWA)
+  [ ] Panneau d'administration
+
+
+--------------------------------------------------------------------------------
+3. CHOIX TECHNIQUES (STACK)
+--------------------------------------------------------------------------------
+Je propose une stack adaptée à quelqu'un qui connaît déjà Python :
+
+FRONTEND (ce que voit l'utilisateur)
+  - React + TypeScript avec Vite (ou Next.js si tu veux le SEO)
+  - TailwindCSS pour le design
+  - Charts : 2 options
+      Option A (la plus rapide) : widget gratuit TradingView (embed)
+                                  -> chart complet sans gérer les données.
+      Option B (plus de contrôle) : librairie "lightweight-charts"
+                                  (open source, par TradingView)
+                                  + tes propres données de prix.
+    Conseil : commencer par A, passer à B ensuite.
+  - Zustand ou Redux Toolkit : état global (paire choisie, timeframe)
+  - React Query (TanStack Query) : appels API + cache
+
+BACKEND (serveur)
+  - Python 3.12 + FastAPI (rapide, async, WebSocket intégré)
+  - httpx : appels vers les API externes
+  - APScheduler ou Celery : tâches périodiques (récupérer news / CPI)
+  - SQLAlchemy + Alembic : base de données et migrations
+  - Pydantic : validation des données
+
+STOCKAGE
+  - PostgreSQL : news, paires, données macro, utilisateurs
+  - Redis : cache (éviter de dépasser les quotas des API)
+            + Pub/Sub pour diffuser les news en temps réel
+
+OUTILS
+  - Git + GitHub
+  - Docker + docker-compose (tout lancer avec une commande)
+  - VS Code
+  - Postman / Insomnia (tester l'API)
+
+
+--------------------------------------------------------------------------------
+4. SOURCES DE DONNÉES
+--------------------------------------------------------------------------------
+IMPORTANT : les offres gratuites, quotas et prix changent souvent.
+Vérifie chaque site avant de t'inscrire et lis ses conditions d'utilisation.
+
+4.1 PRIX / CHARTS
+  - TradingView Widgets (embed gratuit)     https://www.tradingview.com/widget/
+  - TradingView lightweight-charts           https://github.com/tradingview/lightweight-charts
+  - Twelve Data  (forex, crypto, or)         https://twelvedata.com
+  - Finnhub      (forex, crypto, WebSocket)  https://finnhub.io
+  - Alpha Vantage (forex, crypto)            https://www.alphavantage.co
+  - Polygon.io   (actions, forex, crypto)    https://polygon.io
+  - OANDA API    (forex, compte requis)      https://developer.oanda.com
+  - Binance API  (crypto gratuit, temps réel)https://binance-docs.github.io/apidocs/
+
+4.2 NEWS EN TEMPS RÉEL
+  - Finnhub (market news + forex news)       https://finnhub.io/docs/api
+  - NewsAPI                                  https://newsapi.org
+  - Marketaux (news financières par devise)  https://www.marketaux.com
+  - Benzinga API (payant, très rapide)       https://www.benzinga.com/apis
+  - Flux RSS gratuits (Reuters, FXStreet, Investing.com, ForexLive,
+    banques centrales : Fed, BCE, BoE, Bank Al-Maghrib...)
+    -> lire avec la librairie Python "feedparser"
+
+  À PROPOS DE FACEBOOK :
+    L'API de Facebook (Graph API) ne donne PAS un flux d'actualités
+    financières ; l'accès aux pages publiques est très limité et soumis
+    à validation par Meta. Le "scraping" de Facebook est interdit par
+    leurs conditions. => Utiliser plutôt les API de news ci-dessus,
+    les flux RSS, ou X/Twitter API (payante) si tu veux du social.
+
+  "SANS DÉLAI" :
+    Le vrai temps réel (latence de quelques secondes) est en général
+    payant (Benzinga, Bloomberg, Reuters, Dow Jones). Les offres gratuites
+    ont souvent un délai ou un quota. Pour le MVP : RSS + Finnhub + polling
+    toutes les 30-60 s suffit.
+
+4.3 INFLATION / MACRO / CALENDRIER ÉCONOMIQUE
+  - FRED (Fed de St. Louis, gratuit) : CPI US, taux, emploi
+                                             https://fred.stlouisfed.org/docs/api/
+  - Trading Economics (CPI tous pays)        https://tradingeconomics.com/api
+  - Finnhub economic calendar                https://finnhub.io
+  - API de la Banque mondiale (inflation annuelle, gratuit)
+                                             https://datahelpdesk.worldbank.org
+  - Eurostat (inflation zone euro)           https://ec.europa.eu/eurostat
+  - Banques centrales (communiqués / RSS)
+
+  CORRESPONDANCE PAIRE -> PAYS / DEVISES
+    EUR/USD -> Zone euro + États-Unis
+    GBP/USD -> Royaume-Uni + États-Unis
+    USD/JPY -> États-Unis + Japon
+    XAU/USD -> Or : inflation US, taux Fed, dollar (DXY)
+    BTC/USD -> Crypto : inflation US, taux Fed, news crypto
+  => Le site affiche l'inflation des DEUX devises de la paire.
+
+
+--------------------------------------------------------------------------------
+5. ARCHITECTURE GÉNÉRALE
+--------------------------------------------------------------------------------
+
+   [Navigateur utilisateur]
+          |   HTTP (REST)          WebSocket (news live)
+          v                        v
+   +-----------------------------------------------+
+   |         FRONTEND React (Vite)                 |
+   |  Sélecteur paire | Chart | News | Macro       |
+   +-----------------------------------------------+
+          |                        ^
+          v                        |
+   +-----------------------------------------------+
+   |         BACKEND FastAPI (Python)              |
+   |  /api/pairs  /api/news  /api/macro  /ws/news  |
+   +-----------------------------------------------+
+       |            |                 |
+       v            v                 v
+  [PostgreSQL]   [Redis cache    [Workers / Scheduler]
+                  + Pub/Sub]         |  toutes les 30-60 s
+                                     v
+                     API externes : Finnhub, NewsAPI, RSS,
+                     FRED, Trading Economics, Twelve Data...
+
+Principe : le navigateur ne parle JAMAIS directement aux API externes
+(sinon tes clés API seraient visibles). Tout passe par ton backend.
+
+
+--------------------------------------------------------------------------------
+6. ARBORESCENCE COMPLÈTE DES FICHIERS
+--------------------------------------------------------------------------------
+
+marketview/
+|
+|-- README.md
+|-- .gitignore
+|-- .env.example
+|-- docker-compose.yml
+|-- Makefile                       (raccourcis : make dev, make test...)
+|
+|-- docs/
+|   |-- plan_projet.txt            (ce fichier)
+|   |-- api_sources.md             (liste des API, quotas, liens, clés)
+|   |-- maquettes/                 (captures / dessins des écrans)
+|   |-- decisions.md               (choix techniques et pourquoi)
+|
+|-- backend/
+|   |-- Dockerfile
+|   |-- requirements.txt
+|   |-- alembic.ini
+|   |-- alembic/
+|   |   |-- env.py
+|   |   |-- versions/              (migrations de la BDD)
+|   |
+|   |-- app/
+|   |   |-- main.py                (point d'entrée FastAPI)
+|   |   |-- config.py              (lecture du .env)
+|   |   |-- database.py            (connexion PostgreSQL)
+|   |   |-- redis_client.py        (connexion Redis)
+|   |   |
+|   |   |-- models/                (tables SQLAlchemy)
+|   |   |   |-- __init__.py
+|   |   |   |-- pair.py
+|   |   |   |-- news.py
+|   |   |   |-- macro_indicator.py
+|   |   |   |-- economic_event.py
+|   |   |   |-- user.py            (V2)
+|   |   |   |-- watchlist.py       (V2)
+|   |   |
+|   |   |-- schemas/               (formats JSON Pydantic)
+|   |   |   |-- pair.py
+|   |   |   |-- news.py
+|   |   |   |-- macro.py
+|   |   |   |-- user.py
+|   |   |
+|   |   |-- api/                   (routes)
+|   |   |   |-- __init__.py
+|   |   |   |-- pairs.py
+|   |   |   |-- prices.py
+|   |   |   |-- news.py
+|   |   |   |-- macro.py
+|   |   |   |-- calendar.py
+|   |   |   |-- auth.py            (V2)
+|   |   |   |-- websocket.py
+|   |   |
+|   |   |-- services/              (logique métier)
+|   |   |   |-- pair_mapping.py    (paire -> devises -> pays)
+|   |   |   |-- news_filter.py     (associer une news aux devises)
+|   |   |   |-- dedup.py           (supprimer les news en double)
+|   |   |   |-- sentiment.py       (V2 : analyse de sentiment)
+|   |   |   |-- cache.py
+|   |   |
+|   |   |-- providers/             (1 fichier = 1 source externe)
+|   |   |   |-- base.py            (classe commune)
+|   |   |   |-- finnhub.py
+|   |   |   |-- newsapi.py
+|   |   |   |-- marketaux.py
+|   |   |   |-- rss.py
+|   |   |   |-- fred.py
+|   |   |   |-- tradingeconomics.py
+|   |   |   |-- twelvedata.py
+|   |   |   |-- binance.py
+|   |   |
+|   |   |-- workers/               (tâches automatiques)
+|   |   |   |-- scheduler.py       (planifie les tâches)
+|   |   |   |-- fetch_news.py      (toutes les 30-60 s)
+|   |   |   |-- fetch_macro.py     (1 fois / jour)
+|   |   |   |-- fetch_calendar.py  (toutes les heures)
+|   |   |
+|   |   |-- core/
+|   |   |   |-- security.py        (mots de passe, JWT - V2)
+|   |   |   |-- logging.py
+|   |   |   |-- rate_limit.py
+|   |   |
+|   |   |-- data/
+|   |       |-- pairs_seed.json    (liste initiale des paires)
+|   |       |-- rss_feeds.json     (liste des flux RSS)
+|   |
+|   |-- tests/
+|       |-- test_pairs.py
+|       |-- test_news.py
+|       |-- test_macro.py
+|       |-- test_providers.py
+|       |-- test_pair_mapping.py
+|
+|-- frontend/
+    |-- Dockerfile
+    |-- package.json
+    |-- vite.config.ts
+    |-- tsconfig.json
+    |-- tailwind.config.js
+    |-- index.html
+    |-- .env.example
+    |
+    |-- public/
+    |   |-- favicon.ico
+    |   |-- logo.svg
+    |
+    |-- src/
+        |-- main.tsx               (point d'entrée)
+        |-- App.tsx                (routes des pages)
+        |-- index.css
+        |
+        |-- pages/
+        |   |-- HomePage.tsx       (liste des paires)
+        |   |-- MarketPage.tsx     (chart + news + macro)
+        |   |-- LoginPage.tsx      (V2)
+        |   |-- NotFoundPage.tsx
+        |
+        |-- components/
+        |   |-- layout/
+        |   |   |-- Header.tsx
+        |   |   |-- Footer.tsx
+        |   |   |-- Sidebar.tsx
+        |   |-- pairs/
+        |   |   |-- PairSelector.tsx
+        |   |   |-- PairCard.tsx
+        |   |   |-- PairSearch.tsx
+        |   |-- chart/
+        |   |   |-- TradingViewWidget.tsx   (option A)
+        |   |   |-- PriceChart.tsx          (option B)
+        |   |   |-- TimeframeSelector.tsx
+        |   |-- news/
+        |   |   |-- NewsPanel.tsx
+        |   |   |-- NewsItem.tsx
+        |   |   |-- NewsFilter.tsx
+        |   |-- macro/
+        |   |   |-- MacroPanel.tsx
+        |   |   |-- InflationCard.tsx
+        |   |   |-- EconomicCalendar.tsx
+        |   |-- common/
+        |       |-- Loader.tsx
+        |       |-- ErrorMessage.tsx
+        |       |-- ThemeToggle.tsx
+        |
+        |-- hooks/
+        |   |-- usePairs.ts
+        |   |-- useNews.ts
+        |   |-- useMacro.ts
+        |   |-- useNewsSocket.ts   (WebSocket)
+        |
+        |-- services/
+        |   |-- api.ts             (appels vers le backend)
+        |   |-- socket.ts
+        |
+        |-- store/
+        |   |-- marketStore.ts     (paire + timeframe choisis)
+        |
+        |-- types/
+        |   |-- index.ts           (types Pair, News, Macro...)
+        |
+        |-- utils/
+            |-- formatDate.ts
+            |-- formatNumber.ts
+
+
+--------------------------------------------------------------------------------
+7. RÔLE DES FICHIERS IMPORTANTS
+--------------------------------------------------------------------------------
+backend/app/main.py
+  Crée l'application FastAPI, ajoute CORS, inclut les routes,
+  démarre le scheduler au lancement.
+
+backend/app/providers/base.py
+  Classe abstraite "NewsProvider" avec une méthode fetch() qui renvoie
+  une liste de news au même format. Chaque source (finnhub.py, rss.py...)
+  hérite de cette classe => facile d'ajouter / retirer une source.
+
+backend/app/services/pair_mapping.py
+  Dictionnaire : "EURUSD" -> devises ["EUR","USD"] -> pays ["EA","US"]
+  Sert à filtrer les news et à choisir quelles données d'inflation afficher.
+
+backend/app/services/news_filter.py
+  Analyse le titre / texte d'une news et lui attribue des devises
+  (mots-clés : "ECB", "Lagarde", "euro" -> EUR ; "Fed", "Powell",
+  "CPI US" -> USD ; "gold" -> XAU...).
+
+backend/app/services/dedup.py
+  Une même news arrive de plusieurs sources : on compare titre + URL
+  (hash) pour ne la garder qu'une fois.
+
+backend/app/workers/fetch_news.py
+  Toutes les 30-60 s : appelle chaque provider, filtre, déduplique,
+  enregistre en BDD, puis publie les nouvelles news dans Redis
+  -> le WebSocket les envoie aussitôt aux navigateurs.
+
+backend/app/api/websocket.py
+  Route /ws/news/{pair} : l'utilisateur reçoit en direct les news
+  de la paire qu'il regarde.
+
+frontend/src/pages/MarketPage.tsx
+  Mise en page : chart au centre (70%), panneau droit (30%)
+  avec onglets "News" et "Macro / Inflation". Sur mobile : empilés.
+
+frontend/src/hooks/useNewsSocket.ts
+  Ouvre la connexion WebSocket, ajoute chaque nouvelle news en haut
+  de la liste, se reconnecte automatiquement si coupure.
+
+
+--------------------------------------------------------------------------------
+8. BASE DE DONNÉES (tables)
+--------------------------------------------------------------------------------
+pairs
+  id | symbol (EURUSD) | name (Euro / Dollar US) | category (forex, metal,
+  crypto) | base_currency | quote_currency | tradingview_symbol | active
+
+news
+  id | title | summary | url | source | image_url | published_at |
+  currencies (liste) | sentiment (V2) | hash (unique) | created_at
+
+macro_indicators
+  id | country | indicator (CPI, CORE_CPI, INTEREST_RATE...) | value |
+  previous | forecast | period (ex: 2026-09) | release_date | source
+
+economic_events
+  id | country | currency | event_name | impact (low/medium/high) |
+  actual | forecast | previous | event_time
+
+users (V2)
+  id | email | password_hash | created_at
+
+watchlists (V2)
+  id | user_id | pair_id
+
+
+--------------------------------------------------------------------------------
+9. ROUTES DE L'API
+--------------------------------------------------------------------------------
+GET  /api/pairs                         -> liste des paires
+GET  /api/pairs/{symbol}                -> détail d'une paire
+GET  /api/prices/{symbol}?tf=1h         -> bougies OHLC (option B)
+GET  /api/news?pair=EURUSD&limit=50     -> news filtrées
+GET  /api/macro?pair=EURUSD             -> inflation + taux des 2 pays
+GET  /api/calendar?pair=EURUSD&day=today-> événements économiques
+WS   /ws/news/{symbol}                  -> news en direct
+POST /api/auth/register  (V2)
+POST /api/auth/login     (V2)
+GET  /api/watchlist      (V2)
+
+Exemple de réponse /api/macro?pair=EURUSD :
+{
+  "pair": "EURUSD",
+  "countries": [
+    {"country":"EA","indicator":"CPI","value":2.1,"previous":2.0,
+     "forecast":2.1,"period":"2026-09","release_date":"2026-10-17"},
+    {"country":"US","indicator":"CPI","value":...}
+  ]
+}
+(valeurs d'exemple, pas de vraies données)
+
+
+--------------------------------------------------------------------------------
+10. TEMPS RÉEL : AFFICHER LES NEWS "SANS DÉLAI"
+--------------------------------------------------------------------------------
+Étape 1 (MVP)  : polling côté serveur toutes les 30-60 s + WebSocket
+                 vers le navigateur.
+Étape 2        : utiliser les WebSocket des fournisseurs qui en ont
+                 (ex : Finnhub) pour recevoir les news en push.
+Étape 3 (pro)  : fournisseur payant à faible latence.
+
+Respecter les quotas : mettre en cache dans Redis (ex : 60 s pour les
+news, 24 h pour l'inflation) et ne jamais appeler l'API externe à
+chaque visite d'utilisateur.
+
+
+--------------------------------------------------------------------------------
+11. VARIABLES D'ENVIRONNEMENT (.env) - NE JAMAIS LES METTRE SUR GITHUB
+--------------------------------------------------------------------------------
+DATABASE_URL=postgresql://user:password@db:5432/marketview
+REDIS_URL=redis://redis:6379/0
+FINNHUB_API_KEY=
+NEWSAPI_KEY=
+MARKETAUX_KEY=
+FRED_API_KEY=
+TRADINGECONOMICS_KEY=
+TWELVEDATA_KEY=
+JWT_SECRET=                (V2)
+CORS_ORIGINS=http://localhost:5173
+
+Frontend (.env) :
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
+
+
+--------------------------------------------------------------------------------
+12. PLANNING PAR ÉTAPES (environ 8 semaines à temps partiel)
+--------------------------------------------------------------------------------
+SEMAINE 1 - Préparation
+  - Créer le dépôt GitHub, l'arborescence, docker-compose
+  - Créer les comptes et clés API (Finnhub, FRED, NewsAPI...)
+  - Dessiner les maquettes (papier ou Figma)
+
+SEMAINE 2 - Frontend de base
+  - Page d'accueil + sélecteur de paires (données en dur)
+  - Page Marché avec widget TradingView qui change selon la paire
+
+SEMAINE 3 - Backend de base
+  - FastAPI + PostgreSQL + tables + /api/pairs
+  - Relier le frontend au backend
+
+SEMAINE 4 - News
+  - providers : rss.py + finnhub.py
+  - news_filter + dedup + /api/news
+  - NewsPanel côté frontend
+
+SEMAINE 5 - Temps réel
+  - Scheduler + Redis Pub/Sub + WebSocket
+  - useNewsSocket côté frontend
+
+SEMAINE 6 - Inflation et calendrier
+  - providers : fred.py (+ autre source pour zone euro, UK, Japon)
+  - /api/macro, /api/calendar
+  - MacroPanel, InflationCard, EconomicCalendar
+
+SEMAINE 7 - Finitions
+  - Design, mode sombre, mobile, messages d'erreur, chargements
+  - Tests
+
+SEMAINE 8 - Mise en ligne
+  - Déploiement, nom de domaine, HTTPS, surveillance
+
+Ensuite : V2 (comptes, favoris, alertes, sentiment IA).
+
+
+--------------------------------------------------------------------------------
+13. TESTS
+--------------------------------------------------------------------------------
+Backend  : pytest + httpx (tester chaque route, chaque provider avec
+           des réponses simulées "mock").
+Frontend : Vitest + React Testing Library.
+Manuel   : changer de paire, couper Internet (reconnexion WebSocket),
+           tester sur téléphone.
+
+
+--------------------------------------------------------------------------------
+14. MISE EN LIGNE
+--------------------------------------------------------------------------------
+Option simple :
+  - Frontend : Vercel ou Netlify
+  - Backend  : Render, Railway ou Fly.io
+  - BDD      : PostgreSQL managé (Neon, Supabase, ou celui de Render)
+  - Redis    : Upstash
+Option VPS (moins cher à long terme) :
+  - Un VPS (Hetzner, OVH, Contabo...) + Docker + Nginx + Let's Encrypt
+Nom de domaine : .com ou .ma
+(Vérifier les prix et offres gratuites actuelles de chaque hébergeur.)
+
+
+--------------------------------------------------------------------------------
+15. ASPECTS JURIDIQUES ET SÉCURITÉ
+--------------------------------------------------------------------------------
+  - Lire les conditions d'utilisation de chaque API : certaines
+    interdisent l'affichage public ou commercial en offre gratuite.
+  - Afficher la source et le lien de chaque news (ne pas recopier
+    l'article entier : titre + résumé court + lien).
+  - Avertissement visible : "Informations à titre indicatif, pas un
+    conseil en investissement."
+  - Respecter la protection des données personnelles si comptes
+    utilisateurs (au Maroc : loi 09-08, CNDP).
+  - Clés API uniquement côté serveur, HTTPS obligatoire,
+    limitation du nombre de requêtes (rate limit).
+
+
+--------------------------------------------------------------------------------
+16. CHECKLIST FINALE AVANT LANCEMENT
+--------------------------------------------------------------------------------
+  [ ] Toutes les paires affichent un chart correct
+  [ ] Les news changent quand on change de paire
+  [ ] Une nouvelle news apparaît sans recharger la page
+  [ ] L'inflation des 2 devises s'affiche avec date et source
+  [ ] Le calendrier du jour s'affiche
+  [ ] Site utilisable sur mobile
+  [ ] Aucune clé API visible dans le code du navigateur
+  [ ] .env absent de GitHub
+  [ ] Avertissement "pas un conseil financier" présent
+  [ ] HTTPS actif
+
+================================================================================
+                                   FIN DU PLAN
+================================================================================

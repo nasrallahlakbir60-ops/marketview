@@ -10,6 +10,7 @@ import redis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
+from app.api.deps import websocket_user_id
 from app.api.pairs import find_pair
 from app.core.logging import get_logger
 from app.database import SessionLocal
@@ -20,6 +21,7 @@ router = APIRouter(tags=["websocket"])
 logger = get_logger(__name__)
 
 PING_INTERVAL_SECONDS = 25
+CLOSE_UNAUTHORIZED = 4401
 CLOSE_UNKNOWN_PAIR = 4404
 CLOSE_UNAVAILABLE = 1011
 
@@ -34,8 +36,12 @@ def _pair_tags(symbol: str) -> set[str] | None:
 
 @router.websocket("/ws/news/{symbol}")
 async def news_socket(websocket: WebSocket, symbol: str) -> None:
-    tags = await run_in_threadpool(_pair_tags, symbol)
+    user_id = await run_in_threadpool(websocket_user_id, websocket)
+    tags = await run_in_threadpool(_pair_tags, symbol) if user_id else None
     await websocket.accept()
+    if user_id is None:
+        await websocket.close(code=CLOSE_UNAUTHORIZED, reason="Connexion requise")
+        return
     if tags is None:
         await websocket.close(code=CLOSE_UNKNOWN_PAIR, reason="Marché inconnu")
         return

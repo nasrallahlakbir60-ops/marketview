@@ -51,12 +51,24 @@ def seeded(db):
     return db
 
 
+TEST_USER = {"email": "trader@example.com", "password": "motdepasse1", "full_name": "Test Trader"}
+
+
 @pytest.fixture
-def client():
+def anon_client():
+    """Visiteur non connecté."""
     from app.main import app
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def client(anon_client):
+    """Visiteur connecté (compte créé via /api/auth/register, cookie de session conservé)."""
+    response = anon_client.post("/api/auth/register", json=TEST_USER)
+    assert response.status_code == 201, response.text
+    return anon_client
 
 
 @pytest.fixture

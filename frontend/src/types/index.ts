@@ -94,3 +94,25 @@ export interface TimeframeOption {
   label: string;
   value: Timeframe;
 }
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+  has_password: boolean;
+  google_linked: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface AuthConfig {
+  google_client_id: string | null;
+}
+
+export interface Activity {
+  event: string;
+  created_at: string;
+  ip: string | null;
+  user_agent: string | null;
+}

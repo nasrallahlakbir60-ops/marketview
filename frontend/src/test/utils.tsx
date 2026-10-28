@@ -20,7 +20,7 @@ export function renderWithProviders(ui: ReactElement, { route = "/" }: { route?:
 
 /** Remplace fetch : chaque chemin d'API renvoie la réponse JSON associée (ou une erreur HTTP). */
 export function mockFetch(routes: Record<string, unknown | { status: number; body?: unknown }>) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
     const entry = routes[url.pathname];
     if (entry === undefined) return new Response(JSON.stringify({ detail: "Introuvable" }), { status: 404 });

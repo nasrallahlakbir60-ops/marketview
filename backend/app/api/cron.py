@@ -12,6 +12,8 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.core.logging import get_logger
+from app.database import SessionLocal
+from app.services.auth import purge_expired
 from app.services.bootstrap import initialize_database
 from app.workers.fetch_calendar import run_fetch_calendar
 from app.workers.fetch_macro import run_fetch_macro
@@ -29,6 +31,11 @@ def _check_secret(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Non autorisé.")
 
 
+def _purge() -> dict[str, int]:
+    with SessionLocal() as db:
+        return purge_expired(db)
+
+
 @router.get("/refresh")
 async def refresh(authorization: str | None = Header(default=None)) -> dict:
     _check_secret(authorization)
@@ -39,5 +46,10 @@ async def refresh(authorization: str | None = Header(default=None)) -> dict:
         except Exception:  # une source en échec ne doit pas bloquer les autres
             logger.exception("Cron : tâche %s en échec", name)
             result[name] = "erreur"
+    try:
+        result["purge"] = await run_in_threadpool(_purge)
+    except Exception:
+        logger.exception("Cron : purge des sessions / journaux en échec")
+        result["purge"] = "erreur"
     logger.info("Cron refresh : %s", result)
     return result

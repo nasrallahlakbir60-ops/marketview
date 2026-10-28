@@ -1,6 +1,41 @@
 import { Link, NavLink } from "react-router-dom";
 
+import { useMe, useSignOut } from "../../hooks/useAuth";
 import { ThemeToggle } from "../common/ThemeToggle";
+
+function UserMenu() {
+  const { data: user } = useMe();
+  const signOut = useSignOut();
+  if (!user) return null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Link
+        aria-label="Mon compte"
+        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition hover:bg-line/[0.06] sm:pr-3"
+        title={user.email}
+        to="/account"
+      >
+        {user.avatar_url ? (
+          <img alt="" className="h-8 w-8 rounded-full" referrerPolicy="no-referrer" src={user.avatar_url} />
+        ) : (
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-xs font-semibold text-on-accent">
+            {user.full_name.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="hidden max-w-[120px] truncate text-sm text-fg sm:inline">{user.full_name.split(" ")[0]}</span>
+      </Link>
+      <button
+        className="rounded-full px-3 py-2 text-xs text-muted transition hover:text-fg disabled:opacity-60"
+        disabled={signOut.isPending}
+        onClick={() => signOut.mutate()}
+        type="button"
+      >
+        Déconnexion
+      </button>
+    </div>
+  );
+}
 
 export function Header() {
   return (
@@ -33,6 +68,7 @@ export function Header() {
             Marchés en direct
           </span>
           <ThemeToggle />
+          <UserMenu />
         </nav>
       </div>
     </header>

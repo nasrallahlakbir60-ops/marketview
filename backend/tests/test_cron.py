@@ -34,7 +34,8 @@ def test_cron_initializes_and_runs_jobs(client, db, settings, monkeypatch) -> No
     response = client.get("/api/cron/refresh", headers={"Authorization": "Bearer s3cret"})
 
     assert response.status_code == 200
-    assert response.json() == {"pairs_created": 80, "pairs_updated": 0, "news": 3, "macro": "erreur", "calendar": 0}
+    assert response.json() == {"pairs_created": 80, "pairs_updated": 0, "news": 3, "macro": "erreur", "calendar": 0,
+                               "purge": {"sessions": 0, "audit_logs": 0}}
 
 
 def test_initialize_database_runs_migrations_and_seed(tmp_path, monkeypatch) -> None:

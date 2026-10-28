@@ -12,3 +12,5 @@ apscheduler>=3.10,<4.0
 feedparser>=6.0,<7.0
 psycopg[binary]>=3.2,<4.0
 redis>=5.0,<6.0
+argon2-cffi>=23.1,<26.0
+pyjwt[crypto]>=2.8,<3.0

@@ -65,10 +65,11 @@ def test_get_unknown_pair_returns_404(client, seeded) -> None:
     assert "NOPE" in response.json()["detail"]
 
 
-def test_rate_limit_returns_429(client, seeded, monkeypatch) -> None:
+def test_rate_limit_returns_429(client, seeded, monkeypatch, fake_redis) -> None:
     from app.config import get_settings
 
     monkeypatch.setattr(get_settings(), "rate_limit_per_minute", 2)
+    fake_redis.flushall()  # oublie la requête d'inscription du fixture client
 
     assert client.get("/api/pairs").status_code == 200
     assert client.get("/api/pairs").status_code == 200

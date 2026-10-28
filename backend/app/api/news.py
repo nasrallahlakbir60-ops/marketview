@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_user
 from app.api.pairs import get_pair_or_404
 from app.config import get_settings
 from app.core.rate_limit import rate_limit
@@ -11,7 +12,7 @@ from app.schemas.news import NewsOut, SourceStatus
 from app.services import cache, pair_mapping, sources
 from app.services.serverless import ensure_database, refresh_if_stale
 
-router = APIRouter(prefix="/api/news", tags=["news"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
+router = APIRouter(prefix="/api/news", tags=["news"], dependencies=[Depends(rate_limit), Depends(ensure_database), Depends(require_user)])
 
 
 def news_cache_key(symbol: str, limit: int) -> str:

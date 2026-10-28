@@ -10,14 +10,11 @@ from collections import defaultdict
 from fastapi import HTTPException, Request, status
 
 from app.config import get_settings
+from app.core.security import client_ip
 from app.services import cache
 
 WINDOW_SECONDS = 60
 _memory_counters: dict[str, int] = defaultdict(int)
-
-
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 def _hit(key: str) -> int:
@@ -35,13 +32,11 @@ def _hit(key: str) -> int:
         return _memory_counters[key]
 
 
-def rate_limit(request: Request) -> None:
-    """Dépendance FastAPI à ajouter sur les routeurs publics."""
-    limit = get_settings().rate_limit_per_minute
+def _enforce(request: Request, scope: str, limit: int) -> None:
     if limit <= 0:
         return
     bucket = int(time.time() // WINDOW_SECONDS)
-    count = _hit(f"rl:{_client_ip(request)}:{bucket}")
+    count = _hit(f"{scope}:{client_ip(request)}:{bucket}")
     if count > limit:
         retry_after = WINDOW_SECONDS - int(time.time()) % WINDOW_SECONDS
         raise HTTPException(
@@ -49,3 +44,13 @@ def rate_limit(request: Request) -> None:
             detail="Trop de requêtes, réessayez dans un instant.",
             headers={"Retry-After": str(retry_after)},
         )
+
+
+def rate_limit(request: Request) -> None:
+    """Dépendance FastAPI à ajouter sur les routeurs publics."""
+    _enforce(request, "rl", get_settings().rate_limit_per_minute)
+
+
+def auth_rate_limit(request: Request) -> None:
+    """Limite plus stricte sur inscription / connexion (anti force brute sur les mots de passe)."""
+    _enforce(request, "rl-auth", get_settings().auth_rate_limit_per_minute)

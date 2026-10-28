@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_user
 from app.api.pairs import get_pair_or_404
 from app.core.rate_limit import rate_limit
 from app.database import get_db
@@ -13,7 +14,7 @@ from app.services import cache, pair_mapping, sources
 from app.services.serverless import ensure_database, refresh_if_stale
 from app.workers.fetch_calendar import SOURCE_NAME, active_source
 
-router = APIRouter(prefix="/api/calendar", tags=["calendar"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
+router = APIRouter(prefix="/api/calendar", tags=["calendar"], dependencies=[Depends(rate_limit), Depends(ensure_database), Depends(require_user)])
 
 RELATIVE_DAYS = {"yesterday": -1, "today": 0, "tomorrow": 1}
 

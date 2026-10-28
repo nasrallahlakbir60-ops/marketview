@@ -165,7 +165,7 @@ def test_macro_route_unknown_pair(client, seeded) -> None:
 
 # --- Calendrier -------------------------------------------------------------------------
 
-def _calendar_handler(request: httpx.Request) -> httpx.Response:
+def _finnhub_calendar(request: httpx.Request) -> httpx.Response:
     today = datetime.now(timezone.utc).date().isoformat()
     return httpx.Response(200, json={"economicCalendar": [
         {"country": "US", "event": "CPI YoY", "impact": "high", "estimate": 2.9, "prev": 3.0, "time": f"{today} 12:30:00", "unit": "%"},
@@ -175,8 +175,34 @@ def _calendar_handler(request: httpx.Request) -> httpx.Response:
     ]})
 
 
-def test_fetch_calendar_skipped_without_key(seeded) -> None:
-    assert run(_with_client(_calendar_handler, fetch_calendar.run_fetch_calendar)) == 0
+def _forexfactory_calendar(request: httpx.Request) -> httpx.Response:
+    today = datetime.now(timezone.utc).date().isoformat()
+    return httpx.Response(200, json=[
+        {"title": "German ifo Business Climate", "country": "EUR", "date": f"{today}T09:00:00+00:00", "impact": "Low",
+         "forecast": "90.0", "previous": "89.9"},
+        {"title": "Core CPI m/m", "country": "USD", "date": f"{today}T12:30:00+00:00", "impact": "High",
+         "forecast": "0.3%", "previous": "0.2%"},
+        {"title": "Unknown currency", "country": "XYZ", "date": f"{today}T10:00:00+00:00", "impact": "Low", "forecast": "", "previous": ""},
+    ])
+
+
+def _calendar_handler(request: httpx.Request) -> httpx.Response:
+    if request.url.host == "nfs.faireconomy.media":
+        return _forexfactory_calendar(request)
+    return _finnhub_calendar(request)
+
+
+def test_fetch_calendar_without_key_uses_forexfactory(client, seeded) -> None:
+    assert run(_with_client(_calendar_handler, fetch_calendar.run_fetch_calendar)) == 2
+
+    body = client.get("/api/calendar", params={"pair": "EURUSD", "day": "today"}).json()
+
+    assert [event["event_name"] for event in body["events"]] == ["German ifo Business Climate", "Core CPI m/m"]
+    assert body["events"][0]["country"] == "EA"
+    assert body["events"][1]["impact"] == "high"
+    assert body["events"][1]["forecast"] == 0.3
+    assert body["events"][1]["unit"] == "%"
+    assert body["source"] == {"name": "ForexFactory", "configured": True, "message": None}
 
 
 def test_fetch_calendar_and_route(client, seeded, settings, monkeypatch) -> None:
@@ -193,26 +219,41 @@ def test_fetch_calendar_and_route(client, seeded, settings, monkeypatch) -> None
     assert body["events"][1]["forecast"] == 2.9
     assert body["events"][1]["actual"] is None
     assert body["source"]["configured"] is True
+    assert body["source"]["name"] == "Finnhub"
 
     tomorrow = client.get("/api/calendar", params={"pair": "EURUSD", "day": "tomorrow"}).json()
     assert tomorrow["events"] == []
 
 
-def test_fetch_calendar_forbidden_is_reported(client, seeded, settings, monkeypatch) -> None:
+def test_fetch_calendar_forbidden_falls_back_to_forexfactory(client, seeded, settings, monkeypatch) -> None:
     monkeypatch.setattr(settings, "finnhub_api_key", "free-key")
 
-    assert run(_with_client(lambda request: httpx.Response(403, json={}), fetch_calendar.run_fetch_calendar)) == 0
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "finnhub.io":
+            return httpx.Response(403, json={})
+        return _forexfactory_calendar(request)
+
+    assert run(_with_client(handler, fetch_calendar.run_fetch_calendar)) == 2
+
+    body = client.get("/api/calendar", params={"pair": "EURUSD"}).json()
+    assert body["source"]["name"] == "ForexFactory"
+    assert body["source"]["message"] is None
+    assert len(body["events"]) == 2
+
+
+def test_fetch_calendar_failure_is_reported(client, seeded) -> None:
+    assert run(_with_client(lambda request: httpx.Response(503), fetch_calendar.run_fetch_calendar)) == 0
 
     source = client.get("/api/calendar", params={"pair": "EURUSD"}).json()["source"]
     assert source["configured"] is True
-    assert "Accès refusé" in source["message"]
+    assert source["message"] == "Source momentanément indisponible"
 
 
-def test_calendar_route_without_key_and_bad_day(client, seeded) -> None:
+def test_calendar_route_empty_and_bad_day(client, seeded) -> None:
     body = client.get("/api/calendar", params={"pair": "XAUUSD"}).json()
     assert body["currencies"] == ["USD"]
     assert body["events"] == []
-    assert body["source"]["message"].startswith("Source non configurée")
+    assert body["source"] == {"name": "ForexFactory", "configured": True, "message": None}
 
     assert client.get("/api/calendar", params={"pair": "EURUSD", "day": "hier"}).status_code == 422
     assert client.get("/api/calendar", params={"pair": "EURUSD", "day": "2026-10-27"}).status_code == 200

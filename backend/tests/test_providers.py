@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from app.providers.base import ProviderError, short_summary
+from app.providers.forexfactory import fetch_week_calendar, parse_value
 from app.providers.finnhub import FinnhubNewsProvider, FinnhubNotAvailable, fetch_economic_calendar
 from app.providers.rss import FeedConfig, RssProvider, load_feeds
 from tests.helpers import mock_client, rfc822, rss_xml
@@ -111,3 +112,35 @@ def test_finnhub_calendar_normalizes_events() -> None:
     assert events[0]["actual"] is None
     assert events[0]["event_time"].isoformat() == "2026-10-27T12:30:00+00:00"
     assert events[1]["impact"] == "low"
+
+
+def test_forexfactory_parses_values() -> None:
+    assert parse_value("3.7%") == (3.7, "%")
+    assert parse_value("-47") == (-47.0, None)
+    assert parse_value("18.5K") == (18.5, "K")
+    assert parse_value("<0.1%") == (0.1, "%")
+    assert parse_value("") == (None, None)
+    assert parse_value("n/a") == (None, None)
+
+
+def test_forexfactory_calendar_normalizes_events() -> None:
+    payload = [
+        {"title": "SPPI y/y", "country": "JPY", "date": "2026-10-26T19:50:00-04:00", "impact": "Low", "forecast": "3.7%", "previous": "3.6%"},
+        {"title": "Bank Holiday", "country": "NZD", "date": "2026-10-25T15:00:00-04:00", "impact": "Holiday", "forecast": "", "previous": ""},
+        {"title": "Industrial Profit", "country": "CNY", "date": "2026-10-26T21:30:00-04:00", "impact": "Medium", "forecast": "", "previous": "1.2%"},
+        {"title": "Bad date", "country": "USD", "date": "demain", "impact": "High"},
+    ]
+
+    async def go():
+        async with mock_client(lambda request: httpx.Response(200, json=payload)) as client:
+            return await fetch_week_calendar(client)
+
+    events = run(go())
+
+    assert len(events) == 3
+    assert events[0]["event_time"].isoformat() == "2026-10-26T23:50:00+00:00"
+    assert (events[0]["forecast"], events[0]["previous"], events[0]["unit"]) == (3.7, 3.6, "%")
+    assert events[0]["actual"] is None
+    assert events[1]["impact"] == "low"
+    assert events[2]["currency"] == "CNH"
+    assert events[2]["unit"] == "%"

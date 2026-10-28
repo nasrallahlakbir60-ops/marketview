@@ -5,14 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.pairs import get_pair_or_404
-from app.config import get_settings
 from app.core.rate_limit import rate_limit
 from app.database import get_db
 from app.models import EconomicEvent
 from app.schemas.macro import CalendarResponse, EconomicEventOut
 from app.services import cache, pair_mapping, sources
 from app.services.serverless import ensure_database, refresh_if_stale
-from app.workers.fetch_calendar import SOURCE_NAME
+from app.workers.fetch_calendar import SOURCE_NAME, active_source
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"], dependencies=[Depends(rate_limit), Depends(ensure_database)])
 
@@ -39,7 +38,8 @@ def get_calendar(
     pair_row = get_pair_or_404(db, pair)
     target = parse_day(day)
     currencies = pair_mapping.macro_currencies(pair_row.base_currency, pair_row.quote_currency, pair_row.category)
-    status = sources.status(SOURCE_NAME, bool(get_settings().finnhub_api_key), "FINNHUB_API_KEY")
+    # Le repli ForexFactory ne demande aucune clé : la source est toujours configurée.
+    status = sources.status(SOURCE_NAME, True).model_copy(update={"name": active_source()})
 
     key = f"calendar:{pair_row.symbol}:{target.isoformat()}"
     cached = cache.get_json(key)

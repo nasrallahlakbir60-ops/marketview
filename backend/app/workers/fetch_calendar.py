@@ -1,4 +1,8 @@
-"""Tâche calendrier économique (toutes les heures) via Finnhub, si FINNHUB_API_KEY est fournie."""
+"""Tâche calendrier économique (toutes les heures).
+
+Finnhub est utilisé si FINNHUB_API_KEY est fournie et que l'offre inclut le calendrier ;
+sinon (pas de clé, accès refusé, panne), repli sur le flux public ForexFactory, sans clé.
+"""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -12,26 +16,40 @@ from app.database import SessionLocal
 from app.models import EconomicEvent
 from app.providers.base import ProviderError
 from app.providers.finnhub import FinnhubNotAvailable, fetch_economic_calendar
+from app.providers.forexfactory import fetch_week_calendar
 from app.services import cache, pair_mapping, sources
 
 logger = get_logger(__name__)
 LOCK_KEY = "lock:fetch_calendar"
-SOURCE_NAME = "Finnhub (calendrier)"
+SOURCE_NAME = "Calendrier économique"
+ACTIVE_SOURCE_KEY = "source:calendar:active"
+DEFAULT_SOURCE = "ForexFactory"
 DAYS_BEFORE = 1
 DAYS_AFTER = 7
 KEEP_DAYS = 14
-_warned_missing = False
 
 
-def save_events(events: list[dict]) -> int:
+def active_source() -> str:
+    """Nom de la dernière source qui a alimenté le calendrier."""
+    name = cache.get_json(ACTIVE_SOURCE_KEY)
+    return name if isinstance(name, str) else DEFAULT_SOURCE
+
+
+def save_events(events: list[dict], source: str) -> int:
+    """Enregistre les événements ; chacun porte soit un code pays (Finnhub), soit une devise (ForexFactory)."""
     mapping = pair_mapping.country_to_currency()
     saved = 0
     with SessionLocal() as db:
         for event in events:
-            country = pair_mapping.normalize_country(event["country"])
-            currency = mapping.get(country)
-            if currency is None:
-                continue  # pays sans paire suivie
+            event = dict(event)
+            if "currency" in event:
+                currency = event["currency"]
+                country = pair_mapping.country_of(currency)
+            else:
+                country = pair_mapping.normalize_country(event["country"])
+                currency = mapping.get(country)
+            if currency is None or country is None:
+                continue  # pays / devise sans paire suivie
             existing = db.scalar(
                 select(EconomicEvent).where(
                     EconomicEvent.country == country,
@@ -39,7 +57,7 @@ def save_events(events: list[dict]) -> int:
                     EconomicEvent.event_time == event["event_time"],
                 )
             )
-            values = {**event, "country": country, "currency": currency, "source": "Finnhub"}
+            values = {**event, "country": country, "currency": currency, "source": source}
             if existing is None:
                 db.add(EconomicEvent(**values))
             else:
@@ -52,29 +70,30 @@ def save_events(events: list[dict]) -> int:
     return saved
 
 
+async def _fetch(client: httpx.AsyncClient, api_key: str) -> tuple[list[dict], str]:
+    if api_key:
+        today = datetime.now(timezone.utc).date()
+        try:
+            events = await fetch_economic_calendar(client, api_key, today - timedelta(days=DAYS_BEFORE), today + timedelta(days=DAYS_AFTER))
+            return events, "Finnhub"
+        except FinnhubNotAvailable as exc:
+            logger.info("Calendrier Finnhub non inclus dans l'offre (%s) : repli sur ForexFactory.", exc)
+        except ProviderError as exc:
+            logger.warning("Calendrier Finnhub en échec (%s) : repli sur ForexFactory.", exc)
+    return await fetch_week_calendar(client), DEFAULT_SOURCE
+
+
 async def run_fetch_calendar(client: httpx.AsyncClient | None = None) -> int:
-    global _warned_missing
     settings = get_settings()
-    if not settings.finnhub_api_key:
-        if not _warned_missing:
-            logger.warning("FINNHUB_API_KEY absente : calendrier économique non disponible.")
-            _warned_missing = True
-        return 0
     if not cache.acquire_lock(LOCK_KEY, 55 * 60):
         return 0
 
-    today = datetime.now(timezone.utc).date()
-    start, end = today - timedelta(days=DAYS_BEFORE), today + timedelta(days=DAYS_AFTER)
     try:
         if client is None:
             async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as own_client:
-                events = await fetch_economic_calendar(own_client, settings.finnhub_api_key, start, end)
+                events, source = await _fetch(own_client, settings.finnhub_api_key)
         else:
-            events = await fetch_economic_calendar(client, settings.finnhub_api_key, start, end)
-    except FinnhubNotAvailable as exc:
-        logger.warning("Calendrier : %s", exc)
-        sources.record_error(SOURCE_NAME, "Accès refusé par Finnhub : calendrier non inclus dans cette offre ou clé invalide")
-        return 0
+            events, source = await _fetch(client, settings.finnhub_api_key)
     except ProviderError as exc:
         logger.warning("Calendrier en échec : %s", exc)
         sources.record_error(SOURCE_NAME, "Source momentanément indisponible")
@@ -82,9 +101,10 @@ async def run_fetch_calendar(client: httpx.AsyncClient | None = None) -> int:
         return 0
 
     sources.clear_error(SOURCE_NAME)
-    count = await asyncio.to_thread(save_events, events)
+    count = await asyncio.to_thread(save_events, events, source)
+    cache.set_json(ACTIVE_SOURCE_KEY, source, 7 * 24 * 3600)
     cache.delete_pattern("calendar:*")
-    logger.info("Calendrier : %d événements enregistrés.", count)
+    logger.info("Calendrier (%s) : %d événements enregistrés.", source, count)
     return count
 
 

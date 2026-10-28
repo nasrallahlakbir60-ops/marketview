@@ -11,7 +11,7 @@ Plateforme web de suivi des marchés : on choisit une paire (forex, or, crypto, 
 - News : 16 flux RSS publics + Finnhub (si clé), filtrées par devise / actif, dédupliquées, titre + résumé court + lien vers la source (nouvel onglet), heure relative (« il y a 5 min »).
 - Temps réel : nouvelles news poussées par WebSocket, animation à l'arrivée, indicateur « En direct », reconnexion automatique.
 - Macro : inflation US mensuelle + taux Fed (FRED), inflation annuelle des 23 pays suivis (Banque mondiale), avec la source, la période et la date de mise à jour. Une valeur indisponible s'affiche « — ».
-- Calendrier économique du jour / de demain (Finnhub), impact faible / moyen / fort en couleur.
+- Calendrier économique d'hier / du jour / de demain (Finnhub si l'offre le permet, sinon flux public ForexFactory sans clé), impact faible / moyen / fort en couleur.
 - Responsive (mobile : chart, puis news, puis macro), thème clair / sombre, états de chargement, vides et d'erreur.
 - Rate limit par IP, logs centralisés, aucune clé API dans le code ni dans le navigateur.
 
@@ -42,7 +42,7 @@ L'application fonctionne **sans aucune clé** : news RSS et inflation Banque mon
 
 | Clé | Où la créer | Variable `.env` | Ce qu'elle active |
 |---|---|---|---|
-| Finnhub | https://finnhub.io/register (clé dans le tableau de bord) | `FINNHUB_API_KEY` | News Finnhub + calendrier économique (le calendrier peut demander une offre payante) |
+| Finnhub | https://finnhub.io/register (clé dans le tableau de bord) | `FINNHUB_API_KEY` | News Finnhub + calendrier économique (le calendrier peut demander une offre payante ; sans lui, repli automatique sur ForexFactory) |
 | FRED | https://fredaccount.stlouisfed.org/apikeys (compte gratuit, puis « Request API Key ») | `FRED_API_KEY` | Inflation US mensuelle, CPI sous-jacent, taux de la Fed |
 
 Sans clé, un avertissement est logué et le panneau concerné affiche « Source non configurée ». Rien ne plante.

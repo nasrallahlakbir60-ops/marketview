@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useCalendar, type CalendarDay } from "../../hooks/useMacro";
+import { useNow } from "../../hooks/useNow";
 import type { EconomicEvent, Impact } from "../../types";
 import { formatTime } from "../../utils/formatDate";
 import { formatWithUnit } from "../../utils/formatNumber";
@@ -23,15 +24,22 @@ export function ImpactBadge({ impact }: { impact: Impact }) {
   );
 }
 
-function EventRow({ event }: { event: EconomicEvent }) {
+const dayLabels: Record<CalendarDay, string> = { yesterday: "Hier", today: "Aujourd'hui", tomorrow: "Demain" };
+
+function EventRow({ event, past, next }: { event: EconomicEvent; past: boolean; next: boolean }) {
   return (
-    <li className="border-b border-line/[0.06] py-2.5 last:border-b-0">
+    <li
+      className={`border-b border-line/[0.06] py-2.5 last:border-b-0 ${past ? "opacity-55" : ""} ${
+        next ? "-mx-2 rounded-lg border-b-transparent bg-accent/[0.06] px-2" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 text-[11px]">
         <time className="w-11 shrink-0 tabular-nums text-muted" dateTime={event.event_time}>
           {formatTime(event.event_time)}
         </time>
         <span className="rounded bg-line/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-fg/80">{event.currency ?? event.country}</span>
         <ImpactBadge impact={event.impact} />
+        {next && <span className="ml-auto text-[10px] font-medium text-accent">Prochaine annonce</span>}
       </div>
       <p className="mt-1 text-xs font-medium leading-5 text-fg">{event.event_name}</p>
       <dl className="mt-1 grid grid-cols-3 gap-2 text-[10px] text-subtle">
@@ -55,13 +63,15 @@ function EventRow({ event }: { event: EconomicEvent }) {
 export function EconomicCalendar({ symbol }: { symbol: string }) {
   const [day, setDay] = useState<CalendarDay>("today");
   const { data, error, isPending, refetch } = useCalendar(symbol, day);
+  const now = useNow();
+  const nextIndex = data?.events.findIndex((event) => new Date(event.event_time).getTime() > now) ?? -1;
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Calendrier économique</h3>
         <div aria-label="Jour" className="flex gap-1" role="group">
-          {(["today", "tomorrow"] as const).map((value) => (
+          {(["yesterday", "today", "tomorrow"] as const).map((value) => (
             <button
               aria-pressed={day === value}
               className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
@@ -71,7 +81,7 @@ export function EconomicCalendar({ symbol }: { symbol: string }) {
               onClick={() => setDay(value)}
               type="button"
             >
-              {value === "today" ? "Aujourd'hui" : "Demain"}
+              {dayLabels[value]}
             </button>
           ))}
         </div>
@@ -81,23 +91,28 @@ export function EconomicCalendar({ symbol }: { symbol: string }) {
         {isPending && <Loader label="Chargement du calendrier..." />}
         {error && <ErrorMessage message={error.message} onRetry={() => void refetch()} />}
         {data && !data.source.configured && (
-          <EmptyState description="Ajoutez FINNHUB_API_KEY dans le fichier .env pour afficher le calendrier." title="Source non configurée" />
+          <EmptyState description="Aucune source n'est disponible pour le calendrier." title="Source non configurée" />
         )}
         {data && data.source.configured && data.events.length === 0 && (
           <EmptyState
-            description={data.source.message ?? `Aucune annonce prévue pour ${data.currencies.join(" / ")} (journée UTC).`}
+            description={data.source.message ?? `Aucune annonce pour ${data.currencies.join(" / ")} ${dayLabels[day].toLocaleLowerCase("fr")} (journée UTC).`}
             title={data.source.message ? "Calendrier indisponible" : "Aucun événement"}
           />
         )}
         {data && data.events.length > 0 && (
           <ul aria-label="Événements économiques">
-            {data.events.map((event) => (
-              <EventRow event={event} key={`${event.event_time}-${event.country}-${event.event_name}`} />
+            {data.events.map((event, index) => (
+              <EventRow
+                event={event}
+                key={`${event.event_time}-${event.country}-${event.event_name}`}
+                next={index === nextIndex}
+                past={new Date(event.event_time).getTime() <= now}
+              />
             ))}
           </ul>
         )}
       </div>
-      {data && data.events.length > 0 && <p className="mt-2 text-[10px] text-subtle">Source : Finnhub · heures locales</p>}
+      {data && data.events.length > 0 && <p className="mt-2 text-[10px] text-subtle">Source : {data.source.name} · heures locales</p>}
     </div>
   );
 }

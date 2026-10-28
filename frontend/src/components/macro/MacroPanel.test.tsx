@@ -41,7 +41,7 @@ const calendar = (overrides: Partial<CalendarResponse> = {}): CalendarResponse =
     { country: "US", currency: "USD", event_name: "CPI YoY", impact: "high", actual: null, forecast: 2.9, previous: 3, unit: "%", event_time: "2026-10-27T12:30:00Z" },
     { country: "EA", currency: "EUR", event_name: "ECB speech", impact: "low", actual: null, forecast: null, previous: null, unit: null, event_time: "2026-10-27T08:00:00Z" },
   ],
-  source: { name: "Finnhub (calendrier)", configured: true, message: null },
+  source: { name: "ForexFactory", configured: true, message: null },
   ...overrides,
 });
 
@@ -68,6 +68,18 @@ describe("MacroPanel", () => {
     expect(await screen.findByText("CPI YoY")).toBeInTheDocument();
     expect(screen.getByText("Fort")).toHaveClass("text-rose-700");
     expect(screen.getByText("Faible")).toBeInTheDocument();
+    expect(screen.getByText("Source : ForexFactory · heures locales")).toBeInTheDocument();
+  });
+
+  it("propose hier / aujourd'hui / demain", async () => {
+    mockFetch({ "/api/macro": macro, "/api/calendar": calendar() });
+
+    renderWithProviders(<MacroPanel pair={eurusd} />);
+
+    for (const label of ["Hier", "Aujourd'hui", "Demain"]) {
+      expect(await screen.findByRole("button", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "Aujourd'hui" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("indique « Source non configurée » sans clé Finnhub ni FRED", async () => {

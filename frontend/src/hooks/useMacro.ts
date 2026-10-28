@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../services/api";
 
-export type CalendarDay = "today" | "tomorrow";
+export type CalendarDay = "yesterday" | "today" | "tomorrow";
 
 export function useMacro(symbol: string) {
   return useQuery({
